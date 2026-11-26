@@ -32,6 +32,13 @@ def _commit_limit(value: str) -> int:
     return limit
 
 
+def _configure_standard_streams() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="gitdash",
@@ -95,6 +102,7 @@ def render(status: RepositoryStatus, *, color: bool = False) -> str:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
+    _configure_standard_streams()
     args = build_parser().parse_args(argv)
     use_color = (
         not args.no_color

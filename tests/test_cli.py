@@ -1,7 +1,9 @@
 import contextlib
 import io
 import json
+import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -66,6 +68,28 @@ class CliTestCase(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertEqual(stdout.getvalue(), "")
         self.assertIn("gitdash:", stderr.getvalue())
+
+    def test_json_output_is_utf8_under_legacy_windows_encoding(self):
+        tracked = self.repo / "tracked.txt"
+        tracked.write_text("content\n", encoding="utf-8")
+        subprocess.run(["git", "-C", str(self.repo), "add", "tracked.txt"], check=True)
+        subprocess.run(
+            ["git", "-C", str(self.repo), "commit", "-m", "中文提交信息"],
+            check=True,
+            capture_output=True,
+        )
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "cp1252"
+
+        result = subprocess.run(
+            [sys.executable, "-m", "gitdash", "--json", str(self.repo)],
+            capture_output=True,
+            env=env,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8", errors="replace"))
+        payload = json.loads(result.stdout.decode("utf-8"))
+        self.assertEqual(payload["commits"][0]["subject"], "中文提交信息")
 
     def test_watch_mode_returns_interrupted_code(self):
         stdout = io.StringIO()
